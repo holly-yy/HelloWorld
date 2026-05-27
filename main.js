@@ -5,31 +5,30 @@ const decrease = document.getElementById('decrease');
 const increase = document.getElementById('increase');
 const objectDistance = document.getElementById('objectDistance');
 
-// Geometry
-const C_X = 400; // Eye center X
-const C_Y = 175; // Eye center Y
-const R = 140;   // Eyeball radius (fit nicely in canvas)
-const LENS_X = C_X + 62; // Lens center X
-const LENS_RADIUS_X = 22;
+// Geometry constants
+const C_X = 400;            // Center of eyeball
+const C_Y = 175;
+const R = 140;              // Eyeball radius
+const LENS_X = C_X - R + 36; // Lens is now near left edge, but just inside the outline
+const LENS_RADIUS_X = 20;
 const LENS_RADIUS_Y = 60;
-const RETINA_X = C_X + R - 8;
+const RETINA_X = C_X + R - 8; // Retina arc (right side)
 
-// Variable
 let lensThickness = 5; // 1 (thin) to 10 (thick)
 let mode = 'far';
 
 // Focal calculation
 function focalLengthForThickness(thickness) {
-  // Lower thickness → longer focal length, higher thickness → shorter focal length
-  return 172 - thickness * 9;
+  // Stronger lens (thicker)=shorter f, weaker=longer f
+  return 160 - thickness * 9;
 }
 
 function getFocusXForLens(thickness, mode) {
   if (mode === 'far') {
     return LENS_X + focalLengthForThickness(thickness);
   } else {
-    // object set at 120px left of lens
-    const objectDistancePx = 120;
+    // For near, use thin lens formula with object outside the eye
+    const objectDistancePx = 90 + 50; // object is 90px left of lens, plus buffer
     const u = -objectDistancePx;
     const f = focalLengthForThickness(thickness);
     const oneOverV = 1/f - 1/u;
@@ -41,7 +40,7 @@ function getFocusXForLens(thickness, mode) {
 function drawScene() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Eye outline -- circle
+  // 1. Eyeball (circle)
   ctx.save();
   ctx.strokeStyle = "#555";
   ctx.lineWidth = 3;
@@ -50,7 +49,7 @@ function drawScene() {
   ctx.stroke();
   ctx.restore();
 
-  // Retina (back arc)
+  // 2. Retina (back arc)
   ctx.save();
   ctx.strokeStyle = "#d33";
   ctx.lineWidth = 5;
@@ -59,7 +58,7 @@ function drawScene() {
   ctx.stroke();
   ctx.restore();
 
-  // Lens
+  // 3. Lens, now near left edge
   ctx.save();
   ctx.translate(LENS_X, C_Y);
   ctx.scale(lensThickness/5, 1.0);
@@ -70,62 +69,60 @@ function drawScene() {
   ctx.stroke();
   ctx.restore();
 
-  // FOCUS calculation
-  const focusX = getFocusXForLens(lensThickness, mode);
-
-  // Draw rays
+  // 4. Rays
   ctx.save();
   ctx.strokeStyle = "#fa0";
   ctx.lineWidth = 2;
-  const offsetY = [-30, 0, 30];
+  const rayOffsets = [-30, 0, 30];
+  const focusX = getFocusXForLens(lensThickness, mode);
 
   if (mode === 'far') {
-    // Parallel rays
-    offsetY.forEach(dy => {
-      const rayStartX = C_X - R + 5;
+    // Parallel rays from the far left, through lens, converge
+    rayOffsets.forEach(dy => {
+      const rayStartX = C_X - R - 40;
       const y = C_Y + dy;
-      const enterX = LENS_X - LENS_RADIUS_X - 5;
+      const enterX = LENS_X - LENS_RADIUS_X - 6;
       // Ray to lens
       ctx.beginPath();
       ctx.moveTo(rayStartX, y);
       ctx.lineTo(enterX, y);
       ctx.stroke();
-      // Converge to focus
+      // Through lens to focus
       ctx.beginPath();
       ctx.moveTo(enterX, y);
       ctx.lineTo(focusX, C_Y);
       ctx.stroke();
     });
   } else {
-    // Near object - rays from a point
-    const objX = LENS_X - 120;
+    // NEAR OBJECT: Diverge from object point outside eye on the left
+    const objX = LENS_X - 90;
     const objY = C_Y;
-    const enterX = LENS_X - LENS_RADIUS_X - 5;
-    offsetY.forEach(dy => {
-      // incoming diverging
+    const enterX = LENS_X - LENS_RADIUS_X - 6;
+    rayOffsets.forEach(dy => {
+      // Incoming: object point to lens entrance ("diverging" rays)
       ctx.beginPath();
       ctx.moveTo(objX, objY);
       ctx.lineTo(enterX, C_Y + dy);
       ctx.stroke();
-      // outgoing through lens, focus
+      // Through lens to focus
       ctx.beginPath();
       ctx.moveTo(enterX, C_Y + dy);
       ctx.lineTo(focusX, C_Y);
       ctx.stroke();
     });
-    // Draw near object
+    // Draw near object as dot, outside the eyeball
     ctx.save();
     ctx.fillStyle = "#444";
     ctx.beginPath();
-    ctx.arc(objX, objY, 7, 0, Math.PI*2);
+    ctx.arc(objX, objY, 8, 0, Math.PI*2);
     ctx.fill();
     ctx.font = "16px sans-serif";
-    ctx.fillText("Near object", objX - 60, objY - 18);
+    ctx.fillText("Near object", objX - 55, objY - 18);
     ctx.restore();
   }
   ctx.restore();
 
-  // Highlight focus point
+  // 5. Highlight focus point
   ctx.save();
   ctx.fillStyle = "#282";
   ctx.beginPath();
@@ -133,17 +130,17 @@ function drawScene() {
   ctx.fill();
   ctx.restore();
 
-  // Labels
+  // 6. Labels
   ctx.save();
   ctx.fillStyle = "#17f";
   ctx.font = "20px sans-serif";
-  ctx.fillText("Lens", LENS_X-24, C_Y-70);
+  ctx.fillText("Lens", LENS_X-24, C_Y-72);
   ctx.fillStyle = "#d33";
   ctx.font = "18px sans-serif";
   ctx.fillText("Retina", RETINA_X + 10, C_Y-15);
   ctx.restore();
 
-  // Focus status text
+  // 7. Focus status text
   ctx.save();
   ctx.fillStyle = "#282";
   ctx.font = "16px sans-serif";
@@ -155,7 +152,7 @@ function drawScene() {
   ctx.restore();
 }
 
-// Controls
+// Controls: no change
 decrease.onclick = () => {
   if (lensThickness > 1) {
     lensThickness--;
@@ -175,6 +172,6 @@ objectDistance.onchange = (e) => {
   drawScene();
 };
 
-// -- Initial draw
+// Init
 thicknessDisplay.innerText = lensThickness;
 drawScene();
