@@ -5,105 +5,95 @@ const decrease = document.getElementById('decrease');
 const increase = document.getElementById('increase');
 const objectDistance = document.getElementById('objectDistance');
 
-let lensThickness = 5; // "thickness" controls lens curvature and thus focal length
-let mode = 'far'; // or 'near'
+// Geometry
+const C_X = 400;    // Eye center X
+const C_Y = 175;    // Eye center Y
+const R = 150;      // Eyeball radius
+const LENS_X = C_X + 70; // Lens center X
+const LENS_RADIUS_X = 22;
+const LENS_RADIUS_Y = 60;
+const RETINA_X = C_X + R - 8;
 
-// Helper to compute (fake, for illustration) focal length as a function of thickness
-function calculateFocalLength(mode, thickness) {
-  // Arbitrary constants to show effect
+// Variable
+let lensThickness = 5; // 1 (thin) to 10 (thick)
+let mode = 'far';
+
+// Focal calculation (simplified). Stronger lens = shorter focal length.
+function focalLengthForThickness(thickness) {
+  // Map lensThickness 1-10 to focal 170 (thin) ... 90 (thick)
+  return 180 - thickness * 10;
+}
+
+// For far/near object, get focus point based on lens
+function getFocusXForLens(thickness, mode) {
   if (mode === 'far') {
-    return 150 - thickness * 8;
+    return LENS_X + focalLengthForThickness(thickness);
   } else {
-    return 100 - thickness * 8;
+    // Near object: object distance much less; use thin lens formula
+    // 1/f = 1/v + 1/u  (u is negative in sign convention)
+    // Let's pick u = -(C_X - R + 70), "objectDistancePx" pixels left of lens
+    const objectDistancePx = 170; // as e.g. 170px to the left of cornea
+    const u = -objectDistancePx;
+    const f = focalLengthForThickness(thickness);
+
+    // 1/f = 1/v + 1/u  => 1/v = 1/f - 1/u
+    const oneOverV = 1/f - 1/u;
+    const v = 1/oneOverV; // image distance from lens
+
+    return LENS_X + v;
   }
 }
 
 function drawScene() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Draw outline of eye
+  // Eyeball as a circle
   ctx.strokeStyle = "#777";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.ellipse(350, 175, 300, 120, 0, 0, Math.PI*2);
+  ctx.arc(C_X, C_Y, R, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Retina line (back of eyeball)
-  const retinaX = 650;
-  ctx.strokeStyle = "#d33";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(retinaX, 70);
-  ctx.lineTo(retinaX, 280);
-  ctx.stroke();
-
-  // Draw adjustable lens
+  // Retina (arc, back of eye)
   ctx.save();
-  ctx.translate(450, 175);
-  ctx.scale(lensThickness/5, 1);
-  ctx.strokeStyle = "#17f";
-  ctx.lineWidth = 6;
+  ctx.strokeStyle = "#d33";
+  ctx.lineWidth = 5;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 24, 60, 0, 0, Math.PI*2);
+  ctx.arc(C_X, C_Y, R-5, Math.PI/2.3, Math.PI*1.7);
   ctx.stroke();
   ctx.restore();
 
-  // Draw rays
-  let raysY = [-30, 0, 30];
+  // Lens
+  ctx.save();
+  ctx.translate(LENS_X, C_Y);
+  ctx.scale(lensThickness/5, 1.0);
+  ctx.strokeStyle = "#17f";
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, LENS_RADIUS_X, LENS_RADIUS_Y, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Ray origins:
+  let rayYs = [-30, 0, 30];
   ctx.strokeStyle = "#fa0";
   ctx.lineWidth = 2;
+  let focusX = getFocusXForLens(lensThickness, mode);
 
-  let focal = calculateFocalLength(mode, lensThickness);
-  raysY.forEach(offsetY => {
-    // start: left of lens
-    let startX = 100, startY = 175 + offsetY;
-    let lensX = 450, lensY = 175 + offsetY;
+  if (mode === 'far') {
+    // FAR object: parallel rays
+    rayYs.forEach(offsetY => {
+      // Incoming parallel rays
+      const rayStartX = C_X - R + 5;
+      const rayStartY = C_Y + offsetY;
+      const lensEntranceX = LENS_X - LENS_RADIUS_X - 5;
 
-    // draw ray to the lens (straight, parallel, as object is distant or near)
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(lensX, lensY);
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(rayStartX, rayStartY);
+      ctx.lineTo(lensEntranceX, rayStartY);
+      ctx.stroke();
 
-    // fake convergence point: ideal (on retina), hyperopic (behind), myopic (in front)
-    let imageX = lensX + focal;
-    if (imageX > retinaX) imageX = retinaX + 30;   // behind retina (hyperopia)
-    if (imageX < retinaX) imageX = retinaX - 30;   // in front (myopia)
-
-    // converge all rays to a single point; fudge for demo
-    ctx.beginPath();
-    ctx.moveTo(lensX, lensY);
-    ctx.lineTo(imageX, 175);
-    ctx.stroke();
-  });
-
-  // Guide marks
-  ctx.fillStyle = "#17f";
-  ctx.font = "20px sans-serif";
-  ctx.fillText("Lens", 430, 170);
-  ctx.fillStyle = "#d33";
-  ctx.fillText("Retina", retinaX + 10, 170);
-}
-
-// Controls
-decrease.onclick = () => {
-  if (lensThickness > 1) {
-    lensThickness--;
-    thicknessDisplay.innerText = lensThickness;
-    drawScene();
-  }
-};
-increase.onclick = () => {
-  if (lensThickness < 10) {
-    lensThickness++;
-    thicknessDisplay.innerText = lensThickness;
-    drawScene();
-  }
-};
-objectDistance.onchange = (e) => {
-  mode = e.target.value;
-  drawScene();
-};
-
-// Initial draw
-drawScene();
+      // Refracted, pass through common focus
+      ctx.beginPath();
+      ctx.moveTo(lensEntrance*
+
