@@ -1,177 +1,226 @@
-const canvas = document.getElementById('eyeballCanvas');
+const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const thicknessDisplay = document.getElementById('thicknessValue');
-const decrease = document.getElementById('decrease');
-const increase = document.getElementById('increase');
-const objectDistance = document.getElementById('objectDistance');
+const decreaseBtn = document.getElementById('decreaseBtn');
+const increaseBtn = document.getElementById('increaseBtn');
+const modeSelect = document.getElementById('modeSelect');
 
-// Geometry constants
-const C_X = 400;            // Center of eyeball
-const C_Y = 175;
-const R = 140;              // Eyeball radius
-const LENS_X = C_X - R + 36; // Lens is now near left edge, but just inside the outline
-const LENS_RADIUS_X = 20;
-const LENS_RADIUS_Y = 60;
-const RETINA_X = C_X + R - 8; // Retina arc (right side)
+// Configuration
+let lensThickness = 5; // 1 to 10
+let mode = 'far'; // 'far' or 'near'
 
-let lensThickness = 5; // 1 (thin) to 10 (thick)
-let mode = 'far';
+// Eyeball dimensions
+const eyeballCenterX = 300;
+const eyeballCenterY = 250;
+const eyeballRadius = 120;
 
-// Focal calculation
-function focalLengthForThickness(thickness) {
-  // Stronger lens (thicker)=shorter f, weaker=longer f
-  return 160 - thickness * 9;
+// Lens position (left side of eyeball, inside)
+const lensX = eyeballCenterX - eyeballRadius + 40;
+const lensY = eyeballCenterY;
+const lensWidth = 18;
+const lensHeight = 80;
+
+// Retina position (right side of eyeball)
+const retinaX = eyeballCenterX + eyeballRadius - 10;
+
+// Focal length based on lens thickness
+function calculateFocalLength(thickness) {
+  // Thicker lens = shorter focal length (stronger lens)
+  return 200 - thickness * 15;
 }
 
-function getFocusXForLens(thickness, mode) {
+// Calculate where rays converge
+function calculateFocusPoint(thickness, mode) {
+  const f = calculateFocalLength(thickness);
+  
   if (mode === 'far') {
-    return LENS_X + focalLengthForThickness(thickness);
+    // For far object with parallel rays: focus = lens + focal length
+    return lensX + f;
   } else {
-    // For near, use thin lens formula with object outside the eye
-    const objectDistancePx = 90 + 50; // object is 90px left of lens, plus buffer
-    const u = -objectDistancePx;
-    const f = focalLengthForThickness(thickness);
-    const oneOverV = 1/f - 1/u;
-    const v = 1/oneOverV;
-    return LENS_X + v;
+    // For near object: use thin lens equation 1/f = 1/u + 1/v
+    // Object is 150px to the left of lens
+    const u = -150; // negative for real object on left
+    const v = (f * u) / (u - f);
+    return lensX + v;
   }
 }
 
-function drawScene() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // 1. Eyeball (circle)
-  ctx.save();
-  ctx.strokeStyle = "#555";
+function drawEyeball() {
+  // Draw eyeball circle
+  ctx.strokeStyle = '#333';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(C_X, C_Y, R, 0, Math.PI * 2);
+  ctx.arc(eyeballCenterX, eyeballCenterY, eyeballRadius, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.restore();
-
-  // 2. Retina (back arc)
-  ctx.save();
-  ctx.strokeStyle = "#d33";
-  ctx.lineWidth = 5;
+  
+  // Draw retina (red arc on right side)
+  ctx.strokeStyle = '#d33';
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.arc(C_X, C_Y, R-4, Math.PI/2.3, Math.PI*1.7);
+  ctx.arc(eyeballCenterX, eyeballCenterY, eyeballRadius - 3, -Math.PI/3, Math.PI/3);
   ctx.stroke();
-  ctx.restore();
-
-  // 3. Lens, now near left edge
-  ctx.save();
-  ctx.translate(LENS_X, C_Y);
-  ctx.scale(lensThickness/5, 1.0);
-  ctx.strokeStyle = "#17f";
-  ctx.lineWidth = 7;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, LENS_RADIUS_X, LENS_RADIUS_Y, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-
-  // 4. Rays
-  ctx.save();
-  ctx.strokeStyle = "#fa0";
-  ctx.lineWidth = 2;
-  const rayOffsets = [-30, 0, 30];
-  const focusX = getFocusXForLens(lensThickness, mode);
-
-  if (mode === 'far') {
-    // Parallel rays from the far left, through lens, converge
-    rayOffsets.forEach(dy => {
-      const rayStartX = C_X - R - 40;
-      const y = C_Y + dy;
-      const enterX = LENS_X - LENS_RADIUS_X - 6;
-      // Ray to lens
-      ctx.beginPath();
-      ctx.moveTo(rayStartX, y);
-      ctx.lineTo(enterX, y);
-      ctx.stroke();
-      // Through lens to focus
-      ctx.beginPath();
-      ctx.moveTo(enterX, y);
-      ctx.lineTo(focusX, C_Y);
-      ctx.stroke();
-    });
-  } else {
-    // NEAR OBJECT: Diverge from object point outside eye on the left
-    const objX = LENS_X - 90;
-    const objY = C_Y;
-    const enterX = LENS_X - LENS_RADIUS_X - 6;
-    rayOffsets.forEach(dy => {
-      // Incoming: object point to lens entrance ("diverging" rays)
-      ctx.beginPath();
-      ctx.moveTo(objX, objY);
-      ctx.lineTo(enterX, C_Y + dy);
-      ctx.stroke();
-      // Through lens to focus
-      ctx.beginPath();
-      ctx.moveTo(enterX, C_Y + dy);
-      ctx.lineTo(focusX, C_Y);
-      ctx.stroke();
-    });
-    // Draw near object as dot, outside the eyeball
-    ctx.save();
-    ctx.fillStyle = "#444";
-    ctx.beginPath();
-    ctx.arc(objX, objY, 8, 0, Math.PI*2);
-    ctx.fill();
-    ctx.font = "16px sans-serif";
-    ctx.fillText("Near object", objX - 55, objY - 18);
-    ctx.restore();
-  }
-  ctx.restore();
-
-  // 5. Highlight focus point
-  ctx.save();
-  ctx.fillStyle = "#282";
-  ctx.beginPath();
-  ctx.arc(focusX, C_Y, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // 6. Labels
-  ctx.save();
-  ctx.fillStyle = "#17f";
-  ctx.font = "20px sans-serif";
-  ctx.fillText("Lens", LENS_X-24, C_Y-72);
-  ctx.fillStyle = "#d33";
-  ctx.font = "18px sans-serif";
-  ctx.fillText("Retina", RETINA_X + 10, C_Y-15);
-  ctx.restore();
-
-  // 7. Focus status text
-  ctx.save();
-  ctx.fillStyle = "#282";
-  ctx.font = "16px sans-serif";
-  let place;
-  if (Math.abs(focusX - RETINA_X) < 12) place = "ON retina";
-  else if (focusX < RETINA_X) place = "IN FRONT of retina";
-  else place = "BEHIND retina";
-  ctx.fillText(`Image ${place}`, C_X+38, C_Y+R-26);
-  ctx.restore();
+  
+  // Label
+  ctx.fillStyle = '#d33';
+  ctx.font = 'bold 14px Arial';
+  ctx.fillText('Retina', retinaX + 10, eyeballCenterY + 5);
 }
 
-// Controls: no change
-decrease.onclick = () => {
+function drawLens() {
+  // Draw lens as a scaled ellipse
+  ctx.save();
+  ctx.translate(lensX, lensY);
+  ctx.scale(lensThickness / 5, 1); // thickness controls horizontal scale
+  
+  ctx.strokeStyle = '#17f';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, lensWidth, lensHeight, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  ctx.restore();
+  
+  // Label
+  ctx.fillStyle = '#17f';
+  ctx.font = 'bold 14px Arial';
+  ctx.fillText('Lens', lensX - 25, lensY - 90);
+}
+
+function drawFarObjectRays() {
+  const focusX = calculateFocusPoint(lensThickness, 'far');
+  const rayOffsets = [-40, 0, 40];
+  
+  ctx.strokeStyle = '#ff8800';
+  ctx.lineWidth = 2;
+  
+  rayOffsets.forEach(offset => {
+    const startY = eyeballCenterY + offset;
+    const lensEntryY = startY;
+    const lensEntryX = lensX - (lensWidth * lensThickness / 5) / 2 - 2;
+    
+    // Ray from far left to lens (parallel)
+    ctx.beginPath();
+    ctx.moveTo(50, startY);
+    ctx.lineTo(lensEntryX, lensEntryY);
+    ctx.stroke();
+    
+    // Ray from lens to focus point
+    ctx.beginPath();
+    ctx.moveTo(lensEntryX, lensEntryY);
+    ctx.lineTo(focusX, eyeballCenterY);
+    ctx.stroke();
+  });
+  
+  // Draw focus point
+  ctx.fillStyle = '#282';
+  ctx.beginPath();
+  ctx.arc(focusX, eyeballCenterY, 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawNearObjectRays() {
+  const focusX = calculateFocusPoint(lensThickness, 'near');
+  const rayOffsets = [-40, 0, 40];
+  const objectX = lensX - 150; // Object outside the eyeball
+  const objectY = eyeballCenterY;
+  
+  ctx.strokeStyle = '#ff8800';
+  ctx.lineWidth = 2;
+  
+  // Draw object point
+  ctx.fillStyle = '#444';
+  ctx.beginPath();
+  ctx.arc(objectX, objectY, 8, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Label for object
+  ctx.fillStyle = '#444';
+  ctx.font = '14px Arial';
+  ctx.fillText('Near Object', objectX - 40, objectY - 25);
+  
+  // Draw rays diverging from object point
+  rayOffsets.forEach(offset => {
+    const rayTargetY = eyeballCenterY + offset;
+    const lensEntryX = lensX - (lensWidth * lensThickness / 5) / 2 - 2;
+    
+    // Ray from object to lens (diverging)
+    ctx.beginPath();
+    ctx.moveTo(objectX, objectY);
+    ctx.lineTo(lensEntryX, rayTargetY);
+    ctx.stroke();
+    
+    // Ray from lens to focus point (converging)
+    ctx.beginPath();
+    ctx.moveTo(lensEntryX, rayTargetY);
+    ctx.lineTo(focusX, eyeballCenterY);
+    ctx.stroke();
+  });
+  
+  // Draw focus point
+  ctx.fillStyle = '#282';
+  ctx.beginPath();
+  ctx.arc(focusX, eyeballCenterY, 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFocusStatus() {
+  const focusX = calculateFocusPoint(lensThickness, mode);
+  let status = '';
+  
+  if (Math.abs(focusX - retinaX) < 15) {
+    status = '✓ Image focused ON retina';
+  } else if (focusX < retinaX) {
+    status = '⚠ Image focused IN FRONT of retina (Myopia)';
+  } else {
+    status = '⚠ Image focused BEHIND retina (Hyperopia)';
+  }
+  
+  ctx.fillStyle = '#282';
+  ctx.font = 'bold 16px Arial';
+  ctx.fillText(status, 50, 50);
+}
+
+function draw() {
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw components
+  drawEyeball();
+  drawLens();
+  
+  if (mode === 'far') {
+    drawFarObjectRays();
+  } else {
+    drawNearObjectRays();
+  }
+  
+  drawFocusStatus();
+}
+
+// Event listeners
+decreaseBtn.addEventListener('click', () => {
   if (lensThickness > 1) {
     lensThickness--;
-    thicknessDisplay.innerText = lensThickness;
-    drawScene();
+    thicknessDisplay.textContent = lensThickness;
+    draw();
   }
-};
-increase.onclick = () => {
+});
+
+increaseBtn.addEventListener('click', () => {
   if (lensThickness < 10) {
     lensThickness++;
-    thicknessDisplay.innerText = lensThickness;
-    drawScene();
+    thicknessDisplay.textContent = lensThickness;
+    draw();
   }
-};
-objectDistance.onchange = (e) => {
-  mode = e.target.value;
-  drawScene();
-};
+});
 
-// Init
-thicknessDisplay.innerText = lensThickness;
-drawScene();
+modeSelect.addEventListener('change', (e) => {
+  mode = e.target.value;
+  draw();
+});
+
+// Initial draw
+thicknessDisplay.textContent = lensThickness;
+draw();

@@ -2,21 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Eyeball Simulation - Lens Thickness</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eyeball Lens Simulation</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h2>Eyeball Ray Diagram Simulation</h2>
+  <h1>Eyeball Lens Simulation</h1>
   <div class="controls">
-    <button id="decrease">-</button>
-    <span>Lens Thickness: <span id="thicknessValue">5</span></span>
-    <button id="increase">+</button>
-    <select id="objectDistance">
+    <button id="decreaseBtn">- Thin Lens</button>
+    <span>Lens Thickness: <span id="thicknessValue">5</span>/10</span>
+    <button id="increaseBtn">+ Thick Lens</button>
+    <br><br>
+    <label for="modeSelect">Object Distance:</label>
+    <select id="modeSelect">
       <option value="far">Far Object</option>
       <option value="near">Near Object</option>
     </select>
   </div>
-  <canvas id="eyeballCanvas" width="800" height="350"></canvas>
+  <canvas id="canvas" width="1000" height="500"></canvas>
   <script src="main.js"></script>
 </body>
 </html>
