@@ -24,9 +24,13 @@ const lensHeight = 80;
 const retinaX = eyeballCenterX + eyeballRadius - 10;
 
 // Focal length based on lens thickness
+// Adjusted so that at thickness=5, far rays focus near retina
+// At thickness=10 (thickest), focal length is shorter (stronger lens)
+// At thickness=1 (thinnest), focal length is longer (weaker lens)
 function calculateFocalLength(thickness) {
   // Thicker lens = shorter focal length (stronger lens)
-  return 200 - thickness * 15;
+  // Map: thickness 1 -> f=280, thickness 10 -> f=140
+  return 280 - thickness * 15.5;
 }
 
 // Calculate where rays converge
@@ -40,6 +44,7 @@ function calculateFocusPoint(thickness, mode) {
     // For near object: use thin lens equation 1/f = 1/u + 1/v
     // Object is 150px to the left of lens
     const u = -150; // negative for real object on left
+    if (u === f) return lensX + 10000; // avoid division by zero
     const v = (f * u) / (u - f);
     return lensX + v;
   }
