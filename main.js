@@ -25,18 +25,25 @@ const retinaX = eyeballCenterX + eyeballRadius - 10;
 
 // Focal length based on lens thickness
 // For FAR objects: use standard formula
-// For NEAR objects: adjust to accommodate closer object distance
+// For NEAR objects: use MUCH stronger scaling to properly accommodate diverging rays
 function calculateFocalLength(thickness, mode) {
   if (mode === 'far') {
     // For far object: focal length = 280 - thickness * 15.5
-    // thickness 1 -> f=264.5, thickness 10 -> f=140.5
+    // thickness 1 -> f=264.5 (focus far behind retina)
+    // thickness 5 -> f=202.5 (focus on retina)
+    // thickness 10 -> f=140.5 (focus in front of retina)
     return 280 - thickness * 15.5;
   } else {
     // For NEAR object at 150px distance:
-    // We need stronger lens (shorter focal length) to converge rays
-    // Use different scaling to ensure proper accommodation
-    // thickness 1 -> f=220 (weak), thickness 10 -> f=80 (strong)
-    return 220 - thickness * 15.5;
+    // Thin lens equation: 1/f = 1/u + 1/v
+    // We want: thickness 1 -> rays converge behind retina (larger v)
+    //          thickness 5 -> rays converge on retina
+    //          thickness 10 -> rays converge in front of retina (smaller v)
+    // Much stronger scaling for near objects!
+    // thickness 1 -> f=160 (weak)
+    // thickness 5 -> f=100 (medium)
+    // thickness 10 -> f=40 (strong)
+    return 160 - thickness * 12;
   }
 }
 
