@@ -33,38 +33,45 @@ function calculateFocalLength(thickness, mode) {
     return 280 - thickness * 15.5;
   } else {
     // For NEAR object at 150px distance:
-    // We need very strong scaling so that:
-    // thickness 1 -> very weak lens -> focus behind retina
-    // thickness 5 -> medium lens -> focus ON retina
-    // thickness 10 -> very strong lens -> focus in front of retina
+    // Target: thickness 5 -> focus exactly ON retina (around x=410)
+    // Object at lensX - 150, retina at retinaX ≈ 410
+    // Image distance from lens = retinaX - lensX ≈ 410 - 160 = 250
     
-    // For near object at u=-150, target image at v=270 (retina position)
-    // Using 1/f = 1/v + 1/u: 1/f = 1/270 + 1/(-150) = 1/270 - 1/150
-    // 1/f = (150 - 270)/(270*150) = -120/40500 = -0.00296
-    // f ≈ -337.5 (diverging, which is wrong for converging lens)
+    // Using thin lens: 1/f = 1/u + 1/v
+    // u = 150, target v = 250
+    // 1/f = 1/150 + 1/250 = (250+150)/(150*250) = 400/37500 = 0.01067
+    // f ≈ 93.7
     
-    // Actually for real object: u=-150, we want v around 270 for retina
-    // 1/f = 1/270 - 1/150 gives negative f... let me recalculate
-    // For REAL object and REAL image: 1/f = 1/u + 1/v where both u,v > 0 in magnitude
-    // Object at 150 from lens, image at ~270 from lens
-    // 1/f = 1/150 + 1/270 = (270 + 150)/(150*270) = 420/40500 = 0.01037
-    // f ≈ 96.4
+    // So for thickness 5: f should be ~93.7
+    // Scale up for thinner: thickness 1 -> f much larger
+    // Scale down for thicker: thickness 10 -> f much smaller
+    // Linear: f = 93.7 + (5 - thickness) * scale_factor
     
-    // So for thickness 5 we want f ≈ 96
-    // For thickness 1 we want f >> 96 (weaker)
-    // For thickness 10 we want f << 96 (stronger)
+    // For thickness 1: f = 93.7 + 4*k (should be ~200 for behind retina)
+    // 93.7 + 4*k = 200 => k = 26.6
+    // Check thickness 10: f = 93.7 - 5*26.6 = 93.7 - 133 = -39.3 (negative!)
     
-    // Linear scaling: f = 96 + (5.5 - thickness) * k
-    // When thickness=1: f = 96 + 4.5*k (should be large, ~200)
-    // When thickness=10: f = 96 - 4.5*k (should be small, ~40)
-    // So: 96 + 4.5*k = 200 => k = 23.1
-    // Check: 96 - 4.5*23.1 = 96 - 104 = -8 (too negative!)
+    // Better scaling with steeper gradient:
+    // thickness 1 -> f = 180 (weak)
+    // thickness 5 -> f = 94 (medium, on retina)
+    // thickness 10 -> f = 40 (strong)
     
-    // Better approach: f = 96 + (5-thickness) * scale
-    // thickness 5: f = 96
-    // thickness 1: f = 96 + 4*30 = 216 (weak)
-    // thickness 10: f = 96 - 5*30 = 46 (strong)
-    return 96 + (5 - thickness) * 30;
+    // Using piecewise or adjusted formula:
+    // f = 94 + (5 - thickness) * 21.2
+    // Check: thickness=1: 94 + 4*21.2 = 94 + 84.8 = 178.8 ✓
+    // Check: thickness=10: 94 - 5*21.2 = 94 - 106 = -12 (still negative!)
+    
+    // Use exponential or different scaling:
+    // Let's use: f = 40 + (11 - thickness) * 6
+    // thickness 1: f = 40 + 10*6 = 100 (too weak)
+    // thickness 5: f = 40 + 6*6 = 76 (too strong)
+    
+    // Try: f = 95 + (5 - thickness) * 18
+    // thickness 1: f = 95 + 4*18 = 167 
+    // thickness 5: f = 95 + 0 = 95 ✓
+    // thickness 10: f = 95 - 5*18 = 95 - 90 = 5 (very strong!)
+    
+    return 95 + (5 - thickness) * 18;
   }
 }
 
@@ -78,8 +85,7 @@ function calculateFocusPoint(thickness, mode) {
   } else {
     // For near object: use thin lens equation 1/f = 1/u + 1/v
     // Object is 150px to the left of lens
-    // Using sign convention: object distance u=150 (real object)
-    const u = 150;
+    const u = 150; // real object distance
     if (Math.abs(f - u) < 0.1) return lensX + 500; // avoid division by zero
     const v = (f * u) / (u - f);
     return lensX + v;
